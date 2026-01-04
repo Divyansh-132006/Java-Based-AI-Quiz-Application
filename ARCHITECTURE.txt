@@ -1,0 +1,349 @@
+# System Architecture - AI Question Generation
+
+## Overall Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     Quiz Application                            │
+│                                                                 │
+│  ┌────────────┐    ┌──────────────┐    ┌─────────────────┐   │
+│  │   Login    │───▶│ UserProfile  │───▶│      Quiz       │   │
+│  └────────────┘    └──────────────┘    └─────────────────┘   │
+│                                                │                │
+│                                                ▼                │
+│                                    ┌────────────────────┐      │
+│                                    │  QuestionBank      │      │
+│                                    │  (ENHANCED)        │      │
+│                                    └────────────────────┘      │
+│                                        │           │            │
+│                                        ▼           ▼            │
+│                              ┌──────────────┐  ┌──────────┐    │
+│                              │   Database   │  │   AI     │    │
+│                              │   Questions  │  │ Generator│    │
+│                              └──────────────┘  └──────────┘    │
+│                                                     │            │
+└─────────────────────────────────────────────────────┼───────────┘
+                                                      │
+                                                      ▼
+                                          ┌──────────────────┐
+                                          │  Gemini API      │
+                                          │  (Google Cloud)  │
+                                          └──────────────────┘
+```
+
+## Question Generation Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Step 1: User Request                                            │
+└──────────────────────┬──────────────────────────────────────────┘
+                       ▼
+        ┌──────────────────────────────┐
+        │ Domain: "Java"                │
+        │ Difficulty: "Medium"          │
+        │ Count: 10                     │
+        └──────────────┬────────────────┘
+                       ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ Step 2: QuestionBank Processing                                │
+└──────────────────────┬──────────────────────────────────────────┘
+                       ▼
+            ┌──────────────────┐
+            │  Check Config     │
+            │  AI enabled?      │
+            │  Percentage?      │
+            └────────┬──────────┘
+                     │
+         ┌───────────┴───────────┐
+         ▼                       ▼
+┌─────────────────┐     ┌─────────────────┐
+│ Database Search │     │ AI Generation   │
+│ Get 5 questions │     │ Generate 5 more │
+└────────┬────────┘     └────────┬────────┘
+         │                       │
+         │                       ▼
+         │              ┌─────────────────┐
+         │              │ GeminiGenerator │
+         │              │ - Build prompt   │
+         │              │ - Call API       │
+         │              │ - Parse response │
+         │              └────────┬────────┘
+         │                       │
+         └───────────┬───────────┘
+                     ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ Step 3: Combine & Process                                       │
+│ - Mix questions                                                 │
+│ - Shuffle randomly                                              │
+│ - Cache AI questions (optional)                                 │
+└──────────────────────┬──────────────────────────────────────────┘
+                       ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ Step 4: Return to Quiz                                          │
+│ 10 questions ready for display                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## AI Generation Details
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ GeminiQuestionGenerator.generateQuestions()                     │
+└──────────────────────┬──────────────────────────────────────────┘
+                       ▼
+        ┌──────────────────────────────┐
+        │ 1. Build Prompt              │
+        │    - Domain specification    │
+        │    - Difficulty guidelines   │
+        │    - Format instructions     │
+        │    - JSON template           │
+        └──────────────┬───────────────┘
+                       ▼
+        ┌──────────────────────────────┐
+        │ 2. Call Gemini API           │
+        │    - POST to endpoint        │
+        │    - Include API key         │
+        │    - Send JSON request       │
+        └──────────────┬───────────────┘
+                       ▼
+        ┌──────────────────────────────┐
+        │ 3. Receive Response          │
+        │    - HTTP 200 OK             │
+        │    - JSON response           │
+        │    - Contains AI text        │
+        └──────────────┬───────────────┘
+                       ▼
+        ┌──────────────────────────────┐
+        │ 4. Parse with                │
+        │    SimpleJsonParser          │
+        │    - Extract text            │
+        │    - Parse question array    │
+        │    - Extract fields          │
+        └──────────────┬───────────────┘
+                       ▼
+        ┌──────────────────────────────┐
+        │ 5. Create Question Objects   │
+        │    - Question text           │
+        │    - Options array           │
+        │    - Correct index           │
+        │    - Explanation             │
+        └──────────────┬───────────────┘
+                       ▼
+        ┌──────────────────────────────┐
+        │ 6. Return List<Question>     │
+        └──────────────────────────────┘
+```
+
+## Configuration System
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      config.properties                           │
+├─────────────────────────────────────────────────────────────────┤
+│ gemini.api.key = AIza...                                        │
+│ use.ai.questions = true                                         │
+│ ai.questions.percentage = 50                                    │
+│ cache.ai.questions = true                                       │
+└──────────────────────┬──────────────────────────────────────────┘
+                       ▼
+        ┌──────────────────────────────┐
+        │      Config.java             │
+        │                              │
+        │  - Load properties           │
+        │  - Validate settings         │
+        │  - Provide getters/setters   │
+        └──────────────┬───────────────┘
+                       ▼
+        ┌──────────────────────────────┐
+        │   QuestionBank.java          │
+        │                              │
+        │  Uses config to:             │
+        │  - Check if AI enabled       │
+        │  - Get AI percentage         │
+        │  - Decide caching behavior   │
+        └──────────────────────────────┘
+```
+
+## Hybrid Question Mix Example
+
+```
+Config: ai.questions.percentage = 50
+Request: 10 questions
+
+┌───────────────────────────────────────┐
+│ QuestionBank Logic                    │
+├───────────────────────────────────────┤
+│ Total needed: 10                      │
+│ AI percentage: 50%                    │
+│ AI count: 10 × 50% = 5               │
+│ Database count: 10 - 5 = 5           │
+└──────────┬────────────────────────────┘
+           ▼
+    ┌──────────────┐
+    │  Get from DB │
+    │  5 questions │
+    └──────┬───────┘
+           │
+           ├─────────────┐
+           ▼             ▼
+     Question 1    Question 2
+     Question 3    Question 4
+     Question 5
+           │
+           └──────────────────┐
+                              │
+           ┌──────────────────┴──────┐
+           ▼                         │
+    ┌─────────────┐                 │
+    │ Generate AI │                 │
+    │ 5 questions │                 │
+    └──────┬──────┘                 │
+           │                         │
+           ├─────────────┐          │
+           ▼             ▼          │
+     AI Question 1  AI Question 2   │
+     AI Question 3  AI Question 4   │
+     AI Question 5                  │
+           │                         │
+           └────────┬────────────────┘
+                    ▼
+         ┌─────────────────────┐
+         │ Combine & Shuffle   │
+         │ 10 total questions  │
+         └─────────────────────┘
+```
+
+## Caching Behavior
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ When cache.ai.questions = true                                  │
+└──────────────────────┬──────────────────────────────────────────┘
+                       ▼
+        ┌──────────────────────────────┐
+        │ AI generates questions       │
+        └──────────────┬───────────────┘
+                       ▼
+        ┌──────────────────────────────┐
+        │ QuestionBank saves to file   │
+        │ questions/[Domain].dat       │
+        └──────────────┬───────────────┘
+                       ▼
+        ┌──────────────────────────────┐
+        │ Next time: Load from cache   │
+        │ (No API call needed)         │
+        └──────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ When cache.ai.questions = false                                 │
+└──────────────────────┬──────────────────────────────────────────┘
+                       ▼
+        ┌──────────────────────────────┐
+        │ AI generates questions       │
+        └──────────────┬───────────────┘
+                       ▼
+        ┌──────────────────────────────┐
+        │ Questions used immediately   │
+        │ (NOT saved to file)          │
+        └──────────────┬───────────────┘
+                       ▼
+        ┌──────────────────────────────┐
+        │ Next time: Generate again    │
+        │ (Fresh questions each time)  │
+        └──────────────────────────────┘
+```
+
+## Error Handling Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Request 10 questions                                            │
+└──────────────────────┬──────────────────────────────────────────┘
+                       ▼
+        ┌──────────────────────────────┐
+        │ Try to get AI questions      │
+        └──────────────┬───────────────┘
+                       │
+            ┌──────────┴──────────┐
+            ▼                     ▼
+    ┌─────────────┐        ┌─────────────┐
+    │   SUCCESS   │        │   FAILURE   │
+    └──────┬──────┘        └──────┬──────┘
+           │                      │
+           ▼                      ▼
+    Return mixed           ┌──────────────────┐
+    AI + DB               │ Log error         │
+    questions             │ Fallback to DB    │
+                          │ Return DB only    │
+                          └──────────────────┘
+                          
+No interruption to user!
+Application always works.
+```
+
+## File Structure
+
+```
+divyanshguvi/
+│
+├── Core Application Files
+│   ├── Login.java              # Entry point
+│   ├── Quiz.java               # Quiz interface
+│   ├── Question.java           # Question model
+│   ├── QuestionBank.java       # ENHANCED with AI
+│   ├── UserProfile.java        # User management
+│   ├── QuizResult.java         # Results
+│   └── Rules.java              # Rules display
+│
+├── AI Integration (NEW)
+│   ├── GeminiQuestionGenerator.java  # AI core
+│   ├── Config.java                   # Configuration
+│   └── SimpleJsonParser.java         # JSON parser
+│
+├── Setup & Testing (NEW)
+│   ├── GeminiSetup.java              # Setup wizard
+│   └── TestGeminiIntegration.java    # Test program
+│
+├── Documentation (NEW)
+│   ├── START_HERE.txt                # Quick start
+│   ├── QUICK_START.md                # 5-min guide
+│   ├── GEMINI_AI_GUIDE.md            # Full docs
+│   ├── README_AI_INTEGRATION.md      # Overview
+│   ├── IMPLEMENTATION_SUMMARY.md     # This file
+│   └── ARCHITECTURE.txt              # Architecture
+│
+├── Utilities (NEW)
+│   └── compile_and_run.bat           # Build script
+│
+├── Configuration (auto-generated)
+│   └── config.properties             # Settings
+│
+└── Data Directories
+    ├── profiles/                     # User data
+    └── questions/                    # Question cache
+```
+
+## Data Flow Summary
+
+```
+User Input → QuestionBank → [Config Check]
+                  ↓
+    ┌─────────────┴─────────────┐
+    ↓                           ↓
+Database Query            AI Generation
+    ↓                           ↓
+    └─────────────┬─────────────┘
+                  ↓
+         [Mix & Shuffle]
+                  ↓
+         [Optional Cache]
+                  ↓
+            Return to Quiz
+```
+
+This architecture provides:
+✅ Flexibility (AI on/off/mixed)
+✅ Reliability (automatic fallback)
+✅ Performance (caching)
+✅ Scalability (unlimited domains)
+✅ Maintainability (clean separation)
